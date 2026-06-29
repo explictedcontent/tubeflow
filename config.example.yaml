@@ -147,14 +147,24 @@ niche:
     virality: 0.25    # median per-video virality
     openness: 0.20    # low saturation by mega-channels = room for newcomers
 
+  # Channel fit: tailors recommendations to your constraints. When set, niches get
+  # a fit_score and the agent re-ranks toward what suits you (e.g. on_camera: false
+  # deprioritizes camera-heavy, low-automatability niches).
+  fit:
+    on_camera: false        # will you appear on camera?
+    hours_per_week: 5       # time you can spend per video
+    # budget: "low"         # low / medium / high (informational, used by the agent)
+    # skills: ["editing"]   # informational, used by the agent
+
   # Optional: override the built-in candidate niche list the sweep ranks.
-  # Each entry: name, keywords, format, automatability (0-100, how much AI can do).
+  # Each entry: name, keywords, format, automatability (0-100), rpm (rough $/1000 views).
   # Leave commented to use the built-in list (see niche_finder.py).
   # candidates:
   #   - name: "AI Tools & News"
   #     keywords: ["ai tools", "ai news"]
   #     format: "screen-rec + voice"
   #     automatability: 95
+  #     rpm: 12
 
 # =============================================================================
 # ABOUT SECTION (For YouTube descriptions)

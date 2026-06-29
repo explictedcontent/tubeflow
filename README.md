@@ -110,15 +110,16 @@ cd tubeflow
 
 ## Installed Components
 
-TubeFlow includes **50 files** across 11 categories:
+TubeFlow includes **52 files** across 11 categories:
 
-### Agents (10 files)
+### Agents (11 files)
 
 Specialized AI agents in `.claude/agents/`:
 
 | Agent | File | Purpose |
 |-------|------|---------|
 | **Niche Finder** | `yt-niche-finder.md` | Finds outlier niches, rates virality + automatability, builds a playbook |
+| **Format Analyst** | `yt-format-analyst.md` | Fingerprints winning thumbnails + titles, generates your version |
 | **YouTube Creator** | `youtube-creator.md` | Creates video scripts, ideas, descriptions, full packages |
 | **YouTube Publisher** | `youtube-publisher.md` | Handles post-upload workflow, moves files, creates metadata |
 | **YouTube Syncer** | `youtube-syncer.md` | Syncs published videos to public GitHub repository |
@@ -149,13 +150,14 @@ Workflow skills in `.claude/skills/`:
 | **YouTube Research** | `youtube-research/` | Research orchestration, agent coordination |
 | **Social Workflow** | `social-workflow/` | Platform-specific posting guidelines |
 
-### Python Scripts (6 files)
+### Python Scripts (7 files)
 
 Utility scripts in `.claude/scripts/`:
 
 | Script | Purpose |
 |--------|---------|
 | `niche_finder.py` | Discovers outlier videos, scores virality, ranks niches (YouTube Data API) |
+| `niche_db.py` | SQLite store: accumulates channels/videos/stats for trajectory + backtesting |
 | `sync_videos.py` | Syncs videos to public repo, creates READMEs, updates catalog |
 | `create_issues.py` | Creates GitHub Issues from roadmap for community voting |
 | `fetch_descriptions.py` | Fetches full descriptions from YouTube via yt-dlp |
@@ -471,8 +473,9 @@ See [docs/CONFIGURATION.md](docs/CONFIGURATION.md) for complete reference.
 ```
 tubeflow/
 ├── .claude/
-│   ├── agents/                    # 10 AI agent definitions
+│   ├── agents/                    # 11 AI agent definitions
 │   │   ├── yt-niche-finder.md
+│   │   ├── yt-format-analyst.md
 │   │   ├── youtube-creator.md
 │   │   ├── youtube-publisher.md
 │   │   ├── youtube-syncer.md
@@ -490,8 +493,9 @@ tubeflow/
 │   │   ├── youtube-workflow/
 │   │   ├── youtube-research/
 │   │   └── social-workflow/
-│   └── scripts/                   # 6 Python utilities
+│   └── scripts/                   # 7 Python utilities
 │       ├── niche_finder.py
+│       ├── niche_db.py
 │       ├── sync_videos.py
 │       ├── create_issues.py
 │       ├── fetch_descriptions.py
@@ -715,14 +719,14 @@ Interactive wizard handles prerequisites, configuration, and template processing
 
 | Metric | Value |
 |--------|-------|
-| **Agents** | 10 specialized AI agents |
+| **Agents** | 11 specialized AI agents |
 | **Commands** | 3 slash commands |
 | **Skills** | 3 workflow skills |
 | **Templates** | 8 content templates |
-| **Scripts** | 6 Python utilities |
+| **Scripts** | 7 Python utilities |
 | **Platforms** | 4 (YouTube + LinkedIn + Twitter + Facebook) |
 | **Research agents (parallel)** | 4 + 1 strategist |
-| **Total files** | 50 |
+| **Total files** | 52 |
 | **License** | MIT (fully open-source) |
 
 ---

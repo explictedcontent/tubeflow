@@ -103,6 +103,58 @@ can't measure.
 
 ---
 
+## Intelligence layers (it gets smarter the longer you run it)
+
+The finder is not just a one-shot snapshot. It accumulates data and learns.
+
+### Accumulating database + channel trajectory
+Every run writes discovered channels, videos, and their stats into a local SQLite
+store (`.claude/scripts/.niche_db.sqlite`, gitignored). Re-poll it over time:
+
+```
+python .claude/scripts/niche_finder.py --repoll
+```
+
+`--repoll` re-fetches stats for everything already in the DB and appends a dated
+snapshot (cheap: ~1 quota unit per 50 items). After a few runs across days/weeks you
+get **channel trajectory** — sub growth per week, view acceleration, and outlier
+*consistency*. This is the real breakout signal: a single viral video is often luck,
+but a *channel* posting outlier after outlier is a repeatable, copyable blueprint.
+
+### Demand vs. supply, RPM, and fit
+Three signals turn "what's viral" into "what's worth *your* time":
+- **Demand vs. supply** — `demand_score` (total attention in the niche) crossed with
+  small-creator supply yields a `gap_score`: high demand + few small-channel wins =
+  an opening. High virality in a saturated niche is worth less than a wide-open gap.
+- **RPM** — each niche carries a rough `$/1000 views` band so you don't chase a
+  viral-but-broke niche (sleep music monetizes far worse than personal finance).
+- **Fit** — set `niche.fit` in `config.yaml` (on_camera, hours_per_week, budget,
+  skills). Niches get a `fit_score` and the agent re-ranks toward what suits you, so
+  "best niche" becomes "best niche *for you*."
+
+### Format fingerprinting
+The `yt-format-analyst` agent vision-analyzes the winning thumbnails and titles of a
+niche's outliers, extracts the **replicable formula** (e.g. "shocked face + 3-word
+yellow caps + red arrow", titles like "I tried X for Y days"), and generates *your*
+version — title variations plus a Canva thumbnail draft. It reports patterns only
+when they recur across multiple top videos, and extracts structure (never copies a
+specific creator's thumbnail).
+
+### Score backtesting
+Every run logs its virality predictions. Once they are 30+ days old:
+
+```
+python .claude/scripts/niche_finder.py --backtest
+```
+
+…fetches what actually happened and reports calibration — breakout rate by predicted
+score band, plus a top-half-vs-bottom-half check on whether the score is actually
+predictive. **This sharpens over time:** with little history it has little to say;
+after weeks of `--repoll` it tells you how much to trust the numbers (and whether to
+tune the weights).
+
+---
+
 ## Honest limitations
 
 - **Seed-driven, not a blind crawl.** The YouTube API has no "search channels by

@@ -93,6 +93,12 @@ Spawn `@yt-niche-finder` agent via Task tool to:
 Requires a `YOUTUBE_API_KEY` env var. If missing, the agent tells the user how to
 create one. No topic needed; `$2` (optional) adds seed niches to the built-in sweep.
 
+The agent may hand off to `@yt-format-analyst` (Task tool,
+`subagent_type: "yt-format-analyst"`) to fingerprint a niche's winning thumbnails +
+titles and generate the user's version. Accumulation/calibration modes the agent can
+run or suggest: `niche_finder.py --repoll` (build channel trajectory history over
+days) and `--backtest` (check past predictions against real outcomes).
+
 ### If `$1` = "idea"
 
 Spawn `@youtube-creator` agent via Task tool to:

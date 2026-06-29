@@ -399,7 +399,12 @@ niche:
 | `max_per_keyword` | int | `50` | Videos pulled per keyword (50 = 1 API page = 100 quota units). |
 | `weights` | map | see above | Per-video virality weights (outlier / velocity / engagement). |
 | `niche_weights` | map | see above | Per-niche opportunity weights (breakout / outlier / virality / openness). |
-| `candidates` | list | built-in | Optional override of the candidate niche list (name, keywords, format, automatability). |
+| `fit` | map | unset | Your constraints (`on_camera`, `hours_per_week`, `budget`, `skills`); tailors recommendations to you. |
+| `candidates` | list | built-in | Optional override of the candidate niche list (name, keywords, format, automatability, rpm). |
+
+The finder also accumulates data over time: `--repoll` re-fetches stats for known
+channels/videos to build trajectory history, and `--backtest` checks past predictions
+against real outcomes. State persists in `.claude/scripts/.niche_db.sqlite` (gitignored).
 
 **Requires a free YouTube Data API v3 key.** Create one at the
 [Google Cloud Console](https://console.cloud.google.com/) (enable "YouTube Data

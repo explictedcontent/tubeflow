@@ -49,10 +49,24 @@ The script writes `niche-data.json` + `niche-report.md` + `thumbs/` into
 ## Step 2: Read the Data
 
 Read `niche-data.json`. It contains:
-- `niches[]`: opportunity_score, automatability, automation_score, breakout_channels,
-  avg_outlier_ratio, median_virality, saturation, format.
+- `niches[]`: opportunity_score, automatability, automation_score, **rpm_usd**
+  (rough $/1000 views), **demand_score**, **gap_score** (high demand + few
+  small-creator wins = opportunity), **fit_score** (if the user set `niche.fit`),
+  breakout_channels, avg_outlier_ratio, median_virality, saturation, format.
 - `videos[]`: per-video title, channel, subscribers, views, outlier_ratio,
-  virality_score, thumbnail(_local), url, channel_url.
+  virality_score, thumbnail(_local), url, channel_url, and **trajectory**
+  (sub_growth_per_week etc. once `--repoll` history exists).
+
+Use these in the report: **gap_score** flags under-served demand; **rpm_usd** keeps
+the user from chasing viral-but-broke niches; **fit_score** tailors picks to their
+constraints; **trajectory** distinguishes a rising channel from a one-hit fluke.
+
+### Accumulation & calibration modes (mention to the user)
+The data sharpens over time. Tell the user they can:
+- `python .claude/scripts/niche_finder.py --repoll` every few days → builds channel
+  trajectory history (cheap, ~1 quota unit per 50 items).
+- `python .claude/scripts/niche_finder.py --backtest` → once predictions are 30+
+  days old, checks whether high-scored videos actually broke out (calibrates trust).
 
 ## Step 3: Refine Automatability (your judgement)
 
@@ -104,12 +118,20 @@ viral opportunity** AND the **top 3 by automation score** (dedupe overlap), outp
 - Workflow: niche -> `/youtube-research "[topic]"` -> `/youtube full "[title]"` -> [production]
 ```
 
-## Step 5: Recommend
+## Step 5: Format fingerprint (hand off)
+
+For the user's top 1-2 chosen niches, spawn the **`yt-format-analyst`** agent (Task
+tool, `subagent_type: "yt-format-analyst"`) to vision-analyze the winning thumbnails
++ titles, extract the replicable formula, and generate the user's own title
+variations + thumbnail (via Canva if available). Link its output into the playbook.
+
+## Step 6: Recommend
 
 End with a clear recommendation:
-- **Best overall:** the niche with the strongest opportunity score.
-- **Best to automate:** the highest automation_score niche (90%+ if available).
-- One sentence on the tradeoff between them.
+- **Best overall:** strongest opportunity score (note its RPM so they know the income reality).
+- **Best to automate:** highest automation_score niche (90%+ if available).
+- **Best fit / best gap:** if `fit_score` or a standout `gap_score` changes the pick.
+- One or two sentences on the tradeoffs between them.
 
 ---
 

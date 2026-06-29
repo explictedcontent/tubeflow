@@ -55,6 +55,13 @@ except ImportError:
     print("Error: 'pyyaml' is not installed. Install with: pip install pyyaml")
     sys.exit(1)
 
+# Local SQLite store (stdlib sqlite3) for trajectory + backtesting. Optional:
+# if the module is missing the finder still runs, just without accumulation.
+try:
+    import niche_db
+except ImportError:
+    niche_db = None
+
 
 API_BASE = "https://www.googleapis.com/youtube/v3"
 
@@ -96,23 +103,25 @@ def load_config() -> dict:
 # and a "format" label. The hint seeds the Best-for-Automation ranking; the
 # yt-niche-finder agent refines it with real judgement in the final report.
 
+# "rpm" is a rough estimated USD revenue-per-1000-views band so virality is not
+# mistaken for income (finance/tech earn many times what compilations do).
 DEFAULT_CANDIDATE_NICHES = [
-    {"name": "Sleep / Meditation / Ambient", "keywords": ["sleep music", "rain sounds"], "format": "ambient audio + visuals", "automatability": 99},
-    {"name": "Motivation / Stoicism", "keywords": ["stoicism motivation", "self discipline"], "format": "voiceover + stock", "automatability": 98},
-    {"name": "Scary Stories / Horror Narration", "keywords": ["scary stories", "horror narration"], "format": "faceless narration", "automatability": 97},
-    {"name": "Top 10 / Listicles / Facts", "keywords": ["top 10 facts", "amazing facts"], "format": "faceless listicle", "automatability": 96},
-    {"name": "AI Tools & News", "keywords": ["ai tools", "ai news"], "format": "screen-rec + voice", "automatability": 95},
-    {"name": "Space / Science Explainers", "keywords": ["space facts", "science explained"], "format": "faceless explainer", "automatability": 94},
-    {"name": "True Crime", "keywords": ["true crime story", "unsolved cases"], "format": "faceless narration", "automatability": 93},
-    {"name": "History Explainers", "keywords": ["history explained", "historical events"], "format": "faceless explainer", "automatability": 92},
-    {"name": "Personal Finance / Side Hustles", "keywords": ["side hustle ideas", "passive income"], "format": "faceless voiceover", "automatability": 90},
-    {"name": "Crypto / Investing", "keywords": ["crypto news", "investing for beginners"], "format": "faceless voiceover", "automatability": 88},
-    {"name": "Gaming Highlights / Compilations", "keywords": ["gaming funny moments", "gaming highlights"], "format": "compilation", "automatability": 85},
-    {"name": "Productivity / Study", "keywords": ["productivity tips", "study with me"], "format": "mixed", "automatability": 70},
-    {"name": "Self-Hosting / Homelab", "keywords": ["homelab", "self hosting"], "format": "screen recording", "automatability": 70},
-    {"name": "DIY / Life Hacks", "keywords": ["life hacks", "diy projects"], "format": "compilation / on-camera", "automatability": 65},
-    {"name": "Health / Fitness Tips", "keywords": ["fitness tips", "home workout"], "format": "mixed", "automatability": 60},
-    {"name": "Tech Reviews / Gadgets", "keywords": ["tech review", "best gadgets"], "format": "on-camera", "automatability": 55},
+    {"name": "Sleep / Meditation / Ambient", "keywords": ["sleep music", "rain sounds"], "format": "ambient audio + visuals", "automatability": 99, "rpm": 1},
+    {"name": "Motivation / Stoicism", "keywords": ["stoicism motivation", "self discipline"], "format": "voiceover + stock", "automatability": 98, "rpm": 3},
+    {"name": "Scary Stories / Horror Narration", "keywords": ["scary stories", "horror narration"], "format": "faceless narration", "automatability": 97, "rpm": 3},
+    {"name": "Top 10 / Listicles / Facts", "keywords": ["top 10 facts", "amazing facts"], "format": "faceless listicle", "automatability": 96, "rpm": 4},
+    {"name": "AI Tools & News", "keywords": ["ai tools", "ai news"], "format": "screen-rec + voice", "automatability": 95, "rpm": 12},
+    {"name": "Space / Science Explainers", "keywords": ["space facts", "science explained"], "format": "faceless explainer", "automatability": 94, "rpm": 5},
+    {"name": "True Crime", "keywords": ["true crime story", "unsolved cases"], "format": "faceless narration", "automatability": 93, "rpm": 5},
+    {"name": "History Explainers", "keywords": ["history explained", "historical events"], "format": "faceless explainer", "automatability": 92, "rpm": 5},
+    {"name": "Personal Finance / Side Hustles", "keywords": ["side hustle ideas", "passive income"], "format": "faceless voiceover", "automatability": 90, "rpm": 18},
+    {"name": "Crypto / Investing", "keywords": ["crypto news", "investing for beginners"], "format": "faceless voiceover", "automatability": 88, "rpm": 15},
+    {"name": "Gaming Highlights / Compilations", "keywords": ["gaming funny moments", "gaming highlights"], "format": "compilation", "automatability": 85, "rpm": 2},
+    {"name": "Productivity / Study", "keywords": ["productivity tips", "study with me"], "format": "mixed", "automatability": 70, "rpm": 8},
+    {"name": "Self-Hosting / Homelab", "keywords": ["homelab", "self hosting"], "format": "screen recording", "automatability": 70, "rpm": 10},
+    {"name": "DIY / Life Hacks", "keywords": ["life hacks", "diy projects"], "format": "compilation / on-camera", "automatability": 65, "rpm": 4},
+    {"name": "Health / Fitness Tips", "keywords": ["fitness tips", "home workout"], "format": "mixed", "automatability": 60, "rpm": 8},
+    {"name": "Tech Reviews / Gadgets", "keywords": ["tech review", "best gadgets"], "format": "on-camera", "automatability": 55, "rpm": 12},
 ]
 
 
@@ -141,11 +150,13 @@ def get_candidate_niches(config: dict, seeds: Optional[list]) -> list:
 class ApiClient:
     """Thin YouTube Data API client with on-disk caching and quota tracking."""
 
-    def __init__(self, api_key: str, cache_dir: Path, rescore: bool = False):
+    def __init__(self, api_key: str, cache_dir: Path, rescore: bool = False,
+                 force_refresh: bool = False):
         self.api_key = api_key
         self.cache_dir = cache_dir
         self.cache_dir.mkdir(parents=True, exist_ok=True)
         self.rescore = rescore           # cache-only mode (no network, 0 quota)
+        self.force_refresh = force_refresh  # always hit network (for fresh snapshots)
         self.quota_spent = 0
 
     def _cache_path(self, endpoint: str, params: dict) -> Path:
@@ -157,7 +168,7 @@ class ApiClient:
     def get(self, endpoint: str, params: dict, quota_cost: int) -> Optional[dict]:
         cache_path = self._cache_path(endpoint, params)
 
-        if cache_path.exists():
+        if cache_path.exists() and not self.force_refresh:
             with open(cache_path, "r", encoding="utf-8") as f:
                 return json.load(f)
 
@@ -305,13 +316,15 @@ def build_video_records(videos: dict, channels: dict, niche_name: str,
     """
     Turn raw API data into scored records for one niche.
 
-    Returns (in_band_records, total_found, big_channel_count) where
-    big_channel_count counts videos whose channel exceeds sub_max (a saturation
-    signal - the niche is crowded with incumbents).
+    Returns (in_band_records, total_found, big_channel_count, total_views_all)
+    where big_channel_count counts videos whose channel exceeds sub_max (a
+    saturation signal) and total_views_all sums views across every found video
+    regardless of band (a demand signal - how much attention the niche pulls).
     """
     records = []
     total_found = 0
     big_channel_count = 0
+    total_views_all = 0
 
     for vid, video in videos.items():
         stats = video.get("statistics", {})
@@ -329,6 +342,7 @@ def build_video_records(videos: dict, channels: dict, niche_name: str,
         comments = _safe_int(stats.get("commentCount"))
 
         total_found += 1
+        total_views_all += views
         if subs > sub_max:
             big_channel_count += 1
         if subs < sub_min or subs > sub_max:
@@ -351,6 +365,10 @@ def build_video_records(videos: dict, channels: dict, niche_name: str,
             "channel_title": snippet.get("channelTitle", ""),
             "channel_thumb": (channel.get("snippet", {}).get("thumbnails", {})
                               .get("default", {}).get("url", "")),
+            "channel_video_count": _safe_int(ch_stats.get("videoCount")),
+            "channel_total_views": _safe_int(ch_stats.get("viewCount")),
+            "channel_country": channel.get("snippet", {}).get("country", ""),
+            "channel_created": channel.get("snippet", {}).get("publishedAt", ""),
             "url": f"https://www.youtube.com/watch?v={vid}",
             "channel_url": f"https://www.youtube.com/channel/{channel_id}",
             "thumbnail": thumb_url,
@@ -365,7 +383,7 @@ def build_video_records(videos: dict, channels: dict, niche_name: str,
             "engagement_rate": round(engagement, 4),
         })
 
-    return records, total_found, big_channel_count
+    return records, total_found, big_channel_count, total_views_all
 
 
 def score_videos(records: list, weights: dict) -> None:
@@ -391,14 +409,14 @@ def score_videos(records: list, weights: dict) -> None:
 
 
 def score_niches(niche_records: dict, niche_meta: dict, found_counts: dict,
-                 big_counts: dict, niche_weights: dict) -> list:
+                 big_counts: dict, view_totals: dict, niche_weights: dict,
+                 fit: Optional[dict] = None) -> list:
     """
-    Aggregate per-video scores into a per-niche opportunity score and an
-    automation-weighted score. Returns a list of niche summary dicts.
+    Aggregate per-video scores into per-niche opportunity, automation, demand/
+    supply, monetization (RPM), and fit signals. Returns a list of summaries.
     """
     summaries = []
 
-    # First pass: raw aggregates per niche.
     raw = {}
     for name, records in niche_records.items():
         if not records:
@@ -414,6 +432,7 @@ def score_niches(niche_records: dict, niche_meta: dict, found_counts: dict,
             "median_virality": median_virality,
             "saturation": saturation,
             "n_videos": len(records),
+            "demand_views": view_totals.get(name, 0),
         }
 
     if not raw:
@@ -424,6 +443,8 @@ def score_niches(niche_records: dict, niche_meta: dict, found_counts: dict,
     n_outlier = _norm([math.log1p(raw[n]["avg_outlier"]) for n in names])
     n_virality = _norm([raw[n]["median_virality"] for n in names])
     n_open = _norm([1.0 - raw[n]["saturation"] for n in names])  # openness = low saturation
+    n_demand = _norm([math.log1p(raw[n]["demand_views"]) for n in names])
+    n_supply = _norm([float(raw[n]["n_videos"]) for n in names])  # in-band small-creator supply
 
     w_b = niche_weights.get("breakout", 0.30)
     w_o = niche_weights.get("outlier", 0.25)
@@ -435,7 +456,14 @@ def score_niches(niche_records: dict, niche_meta: dict, found_counts: dict,
                        + w_v * n_virality[i] + w_s * n_open[i]) * 100
         meta = niche_meta.get(name, {})
         automatability = meta.get("automatability", 75)
+        rpm = meta.get("rpm")
         auto_score = opportunity * (automatability / 100.0)
+
+        # Demand vs supply: high attention but few small-creator wins = a gap.
+        demand = n_demand[i]
+        gap_score = round(demand * (1.0 - n_supply[i]) * 100, 1)
+
+        fit_score = _fit_score(automatability, fit) if fit else None
 
         summaries.append({
             "niche": name,
@@ -443,6 +471,10 @@ def score_niches(niche_records: dict, niche_meta: dict, found_counts: dict,
             "opportunity_score": round(opportunity, 1),
             "automatability": automatability,
             "automation_score": round(auto_score, 1),
+            "rpm_usd": rpm,
+            "demand_score": round(demand * 100, 1),
+            "gap_score": gap_score,
+            "fit_score": fit_score,
             "breakout_channels": raw[name]["breakout_freq"],
             "avg_outlier_ratio": round(raw[name]["avg_outlier"], 2),
             "median_virality": round(raw[name]["median_virality"], 1),
@@ -452,6 +484,20 @@ def score_niches(niche_records: dict, niche_meta: dict, found_counts: dict,
 
     summaries.sort(key=lambda s: s["opportunity_score"], reverse=True)
     return summaries
+
+
+def _fit_score(automatability: int, fit: dict) -> float:
+    """
+    Score how well a niche fits the user's constraints (0-100). Penalizes
+    low-automatability niches when the user won't go on camera or has few hours.
+    """
+    score = 100.0
+    if fit.get("on_camera") is False and automatability < 60:
+        score -= (60 - automatability)            # camera-heavy niche, no camera
+    hours = fit.get("hours_per_week")
+    if isinstance(hours, (int, float)) and hours < 5 and automatability < 80:
+        score -= (80 - automatability) * 0.5       # little time, needs lots of manual work
+    return round(max(score, 0.0), 1)
 
 
 # === THUMBNAILS ===
@@ -503,12 +549,22 @@ def write_report(out_dir: Path, niche_summaries: list, all_records: list,
 
     lines.append("## Ranking 1 - Viral Opportunity")
     lines.append("")
-    lines.append("| # | Niche | Opportunity | Auto % | Breakout chans | Avg outlier | Saturation |")
-    lines.append("|---|-------|-------------|--------|----------------|-------------|------------|")
+    lines.append("| # | Niche | Opportunity | Auto % | ~RPM | Demand | Gap | Avg outlier | Saturation |")
+    lines.append("|---|-------|-------------|--------|------|--------|-----|-------------|------------|")
     for i, s in enumerate(niche_summaries, 1):
+        rpm = f"${s['rpm_usd']}" if s.get("rpm_usd") is not None else "-"
         lines.append(f"| {i} | {s['niche']} | {s['opportunity_score']} | {s['automatability']}% | "
-                     f"{s['breakout_channels']} | {s['avg_outlier_ratio']}x | {s['saturation']} |")
+                     f"{rpm} | {s.get('demand_score', '-')} | {s.get('gap_score', '-')} | "
+                     f"{s['avg_outlier_ratio']}x | {s['saturation']} |")
     lines.append("")
+    lines.append("*Demand = attention in the niche; Gap = high demand but few small-creator wins "
+                 "(opportunity); ~RPM = rough $/1000 views, so virality is not mistaken for income.*")
+    lines.append("")
+    if any(s.get("fit_score") is not None for s in niche_summaries):
+        fit_sorted = sorted(niche_summaries, key=lambda s: s.get("fit_score") or 0, reverse=True)
+        lines.append("**Best fit for your constraints:** "
+                     + ", ".join(f"{s['niche']} ({s['fit_score']})" for s in fit_sorted[:3]))
+        lines.append("")
 
     auto_sorted = sorted(niche_summaries, key=lambda s: s["automation_score"], reverse=True)
     lines.append("## Ranking 2 - Best for Automation")
@@ -547,6 +603,10 @@ def write_report(out_dir: Path, niche_summaries: list, all_records: list,
             lines.append(f"{r['channel_title']} | {r['subscribers']:,} subs | "
                          f"{r['views']:,} views | **{r['outlier_ratio']}x outlier** | "
                          f"score {r.get('virality_score', 0)} | {r['days_since_publish']}d old  ")
+            traj = r.get("trajectory") or {}
+            if traj.get("has_history"):
+                lines.append(f"_trajectory: {traj['sub_growth_per_week']:+} subs/week over "
+                             f"{traj['span_days']}d ({traj['n_snapshots']} snapshots)_  ")
             lines.append(f"[video]({r['url']}) | [channel]({r['channel_url']})")
             lines.append("")
 
@@ -567,6 +627,95 @@ def write_data(out_dir: Path, niche_summaries: list, all_records: list, params: 
     with open(data_path, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
     return data_path
+
+
+# === REPOLL & BACKTEST (Phase 1.5: trajectory + calibration) ===
+
+def run_repoll(client: "ApiClient", conn) -> None:
+    """Re-fetch stats for every channel/video in the DB and append snapshots."""
+    ts = niche_db.now_iso()
+    channel_ids = niche_db.known_channel_ids(conn)
+    video_ids = niche_db.known_video_ids(conn)
+    print(f"Re-polling {len(channel_ids)} channels and {len(video_ids)} videos...")
+
+    channels = fetch_channels(client, channel_ids)
+    n_ch = 0
+    for cid, ch in channels.items():
+        s = ch.get("statistics", {})
+        sn = ch.get("snippet", {})
+        niche_db.record_channel(conn, cid, sn.get("title", ""), sn.get("country", ""),
+                                sn.get("publishedAt", ""), _safe_int(s.get("subscriberCount")),
+                                _safe_int(s.get("videoCount")), _safe_int(s.get("viewCount")), ts)
+        n_ch += 1
+
+    videos = fetch_videos(client, video_ids)
+    n_vid = 0
+    for vid, v in videos.items():
+        s = v.get("statistics", {})
+        sn = v.get("snippet", {})
+        niche_db.record_video(conn, vid, sn.get("channelId", ""), sn.get("title", ""),
+                              None, sn.get("publishedAt", ""),
+                              (sn.get("thumbnails", {}).get("high", {}) or {}).get("url", ""),
+                              _safe_int(s.get("viewCount")), _safe_int(s.get("likeCount")),
+                              _safe_int(s.get("commentCount")), ts)
+        n_vid += 1
+
+    conn.commit()
+    print(f"Appended snapshots for {n_ch} channels and {n_vid} videos. Quota spent: "
+          f"{client.quota_spent} units. Run this every few days to build trajectory history.")
+
+
+def run_backtest(client: "ApiClient", conn, min_age_days: int) -> None:
+    """Check predictions against current reality and print a calibration report."""
+    preds = niche_db.due_predictions(conn, min_age_days)
+    if not preds:
+        print(f"No predictions are at least {min_age_days} days old yet. Backtesting needs "
+              f"history - keep running the finder and check back later.")
+        return
+
+    print(f"Backtesting {len(preds)} predictions (>= {min_age_days} days old)...")
+    video_ids = [p["video_id"] for p in preds]
+    current = fetch_videos(client, video_ids)
+
+    rows = []
+    for p in preds:
+        v = current.get(p["video_id"])
+        if not v:
+            continue  # video deleted/private
+        now_views = _safe_int(v.get("statistics", {}).get("viewCount"))
+        subs0 = max(p["subs_at_prediction"] or 1, 1)
+        actual_outlier = now_views / subs0
+        rows.append({
+            "score": p["virality_score"] or 0,
+            "actual_outlier": actual_outlier,
+            "hit": actual_outlier >= 10,  # >=10x then-subscriber count = real breakout
+        })
+
+    if not rows:
+        print("None of the predicted videos are still available to evaluate.")
+        return
+
+    # Hit rate by predicted-score band.
+    bands = [(0, 25), (25, 50), (50, 75), (75, 101)]
+    print("\nPredicted score band -> actual breakout rate (>=10x then-subs):")
+    for lo, hi in bands:
+        b = [r for r in rows if lo <= r["score"] < hi]
+        if not b:
+            continue
+        rate = sum(1 for r in b if r["hit"]) / len(b) * 100
+        avg = sum(r["actual_outlier"] for r in b) / len(b)
+        print(f"  {lo:>3}-{hi-1:<3}: {rate:5.1f}% breakout  (n={len(b)}, avg {avg:.1f}x outlier)")
+
+    # Rank correlation sanity check (does higher score -> higher actual outlier?).
+    ordered = sorted(rows, key=lambda r: r["score"])
+    n = len(ordered)
+    top_half = ordered[n // 2:]
+    bot_half = ordered[:n // 2]
+    if top_half and bot_half:
+        ta = sum(r["actual_outlier"] for r in top_half) / len(top_half)
+        ba = sum(r["actual_outlier"] for r in bot_half) / len(bot_half)
+        verdict = "predictive" if ta > ba else "NOT predictive - tune weights"
+        print(f"\nTop-half avg {ta:.1f}x vs bottom-half avg {ba:.1f}x outlier -> score looks {verdict}.")
 
 
 # === MAIN ===
@@ -590,6 +739,16 @@ def main():
                         help="Output directory (default: <youtube_root>/niche-research/<date>)")
     parser.add_argument("--rescore", action="store_true",
                         help="Re-score from cached responses only (no network, 0 quota)")
+    parser.add_argument("--repoll", action="store_true",
+                        help="Re-fetch stats for channels/videos already in the DB and append "
+                             "snapshots (builds trajectory history). Cheap: 1 quota unit/50 items")
+    parser.add_argument("--backtest", action="store_true",
+                        help="Evaluate past predictions (>= --backtest-min-age days old) against "
+                             "current reality and print a calibration report")
+    parser.add_argument("--backtest-min-age", type=int, default=30,
+                        help="Minimum age in days for a prediction to be backtested (default 30)")
+    parser.add_argument("--no-db", action="store_true",
+                        help="Skip writing to the local accumulation DB")
     parser.add_argument("--no-thumbnails", action="store_true",
                         help="Skip downloading thumbnail images")
     parser.add_argument("--top-examples", type=int, default=3,
@@ -603,6 +762,22 @@ def main():
         print(f"Error: No API key. Set ${api_key_env} or pass --api-key.")
         print("Create one at https://console.cloud.google.com/ (enable YouTube Data API v3).")
         sys.exit(1)
+
+    # Phase 1.5 modes that operate on the accumulation DB instead of discovering.
+    if args.repoll or args.backtest:
+        if niche_db is None:
+            print("Error: niche_db module not found next to this script; "
+                  "--repoll/--backtest require it.")
+            sys.exit(1)
+        cache_dir = Path(__file__).parent / ".niche_cache"
+        client = ApiClient(api_key or "none", cache_dir, rescore=False, force_refresh=True)
+        conn = niche_db.connect()
+        if args.repoll:
+            run_repoll(client, conn)
+        if args.backtest:
+            run_backtest(client, conn, args.backtest_min_age)
+        conn.close()
+        return
 
     seeds = [s for s in args.seeds.split(",") if s.strip()] if args.seeds else []
     niches = get_candidate_niches(config, seeds)
@@ -634,6 +809,7 @@ def main():
     niche_meta = {}
     found_counts = {}
     big_counts = {}
+    view_totals = {}
 
     for niche in niches:
         name = niche["name"]
@@ -655,11 +831,12 @@ def main():
                        for v in videos.values() if v.get("snippet", {}).get("channelId")}
         channels = fetch_channels(client, channel_ids)
 
-        records, total_found, big = build_video_records(
+        records, total_found, big, views_all = build_video_records(
             videos, channels, name, args.sub_min, args.sub_max)
         niche_records[name] = records
         found_counts[name] = total_found
         big_counts[name] = big
+        view_totals[name] = views_all
         print(f"  {len(records)} in band (of {total_found} found, {big} big channels)")
 
     # Score every in-band video globally (so scores compare across niches).
@@ -671,8 +848,39 @@ def main():
               "increasing --days, or check your API key/quota.")
         sys.exit(0)
 
+    # Accumulate into the DB (channels, videos, snapshots, predictions) and
+    # enrich each record with the channel's growth trajectory from history.
+    if niche_db is not None and not args.no_db:
+        conn = niche_db.connect()
+        ts = niche_db.now_iso()
+        seen_channels = {}
+        for r in all_records:
+            cid = r["channel_id"]
+            if cid and cid not in seen_channels:
+                niche_db.record_channel(conn, cid, r["channel_title"],
+                                        r["channel_country"], r["channel_created"],
+                                        r["subscribers"], r["channel_video_count"],
+                                        r["channel_total_views"], ts)
+                seen_channels[cid] = True
+            niche_db.record_video(conn, r["video_id"], cid, r["title"], r["niche"],
+                                  r["published_at"], r["thumbnail"],
+                                  r["views"], r["likes"], r["comments"], ts)
+            niche_db.log_prediction(conn, r["video_id"], r["niche"],
+                                    r.get("virality_score", 0), r["subscribers"],
+                                    r["views"], r["outlier_ratio"], ts)
+        conn.commit()
+        for r in all_records:
+            traj = niche_db.channel_trajectory(conn, r["channel_id"])
+            r["trajectory"] = traj
+        db_stats = niche_db.stats(conn)
+        conn.close()
+        print(f"\nDB now holds {db_stats['channels']} channels, {db_stats['videos']} videos, "
+              f"{db_stats['channel_snapshots']} channel snapshots "
+              f"(re-run with --repoll over days to build trajectory history).")
+
+    fit = niche_cfg.get("fit") or None
     niche_summaries = score_niches(niche_records, niche_meta, found_counts,
-                                   big_counts, niche_weights)
+                                   big_counts, view_totals, niche_weights, fit)
 
     # Output location.
     if args.output:

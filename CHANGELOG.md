@@ -17,6 +17,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   a per-niche playbook with embedded thumbnails, titles, and a production workflow
 - `niche_finder.py` script with response caching (`--rescore` re-scores at zero quota)
 - `yt-niche-finder` agent and `niche:` configuration block
+- Niche finder accumulation DB (`niche_db.py`, SQLite): persists channels/videos/stats
+  across runs; `--repoll` builds channel trajectory history (sub growth, outlier consistency)
+- Demand-vs-supply gap scoring, rough RPM (monetization) bands per niche, and a
+  `niche.fit` block that tailors recommendations to your constraints (on-camera, time)
+- `yt-format-analyst` agent: vision-analyzes winning thumbnails + titles to extract the
+  replicable format and generate your version (title variations + Canva thumbnail draft)
+- `--backtest` mode: evaluates past virality predictions against real 30-day outcomes
+  and reports calibration (breakout rate by score band)
 - `docs/NICHE_FINDER.md` documenting scoring methodology, algorithm strategy, and limits
 - Windows PowerShell installer (`install.ps1`) for full Windows support
 - GitHub issue templates (bug report, feature request)
