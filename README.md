@@ -110,7 +110,7 @@ cd tubeflow
 
 ## Installed Components
 
-TubeFlow includes **52 files** across 11 categories:
+TubeFlow includes **53 files** across 11 categories:
 
 ### Agents (11 files)
 
@@ -150,7 +150,7 @@ Workflow skills in `.claude/skills/`:
 | **YouTube Research** | `youtube-research/` | Research orchestration, agent coordination |
 | **Social Workflow** | `social-workflow/` | Platform-specific posting guidelines |
 
-### Python Scripts (7 files)
+### Python Scripts (8 files)
 
 Utility scripts in `.claude/scripts/`:
 
@@ -158,6 +158,7 @@ Utility scripts in `.claude/scripts/`:
 |--------|---------|
 | `niche_finder.py` | Discovers outlier videos, scores virality, ranks niches (YouTube Data API) |
 | `niche_db.py` | SQLite store: accumulates channels/videos/stats for trajectory + backtesting |
+| `niche_dashboard.py` | Builds a clickable HTML dashboard (niche cards + click-through workflows) |
 | `sync_videos.py` | Syncs videos to public repo, creates READMEs, updates catalog |
 | `create_issues.py` | Creates GitHub Issues from roadmap for community voting |
 | `fetch_descriptions.py` | Fetches full descriptions from YouTube via yt-dlp |
@@ -493,9 +494,10 @@ tubeflow/
 │   │   ├── youtube-workflow/
 │   │   ├── youtube-research/
 │   │   └── social-workflow/
-│   └── scripts/                   # 7 Python utilities
+│   └── scripts/                   # 8 Python utilities
 │       ├── niche_finder.py
 │       ├── niche_db.py
+│       ├── niche_dashboard.py
 │       ├── sync_videos.py
 │       ├── create_issues.py
 │       ├── fetch_descriptions.py
@@ -723,10 +725,10 @@ Interactive wizard handles prerequisites, configuration, and template processing
 | **Commands** | 3 slash commands |
 | **Skills** | 3 workflow skills |
 | **Templates** | 8 content templates |
-| **Scripts** | 7 Python utilities |
+| **Scripts** | 8 Python utilities |
 | **Platforms** | 4 (YouTube + LinkedIn + Twitter + Facebook) |
 | **Research agents (parallel)** | 4 + 1 strategist |
-| **Total files** | 52 |
+| **Total files** | 53 |
 | **License** | MIT (fully open-source) |
 
 ---

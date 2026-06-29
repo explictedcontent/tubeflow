@@ -84,7 +84,38 @@ looking at the **actual top videos** in `videos[]` for that niche. Use this rubr
 
 State **what AI does** and **what the human must do** for each niche.
 
-## Step 4: Write the Playbook Report
+## Step 4: Build the dashboard (primary deliverable)
+
+The headline output is a clickable HTML dashboard. Do this:
+
+1. **Author `niche-workflows.json`** next to `niche-data.json` - an object keyed by
+   niche name. For the **top 3 by viral opportunity** AND **top 3 by automation
+   score** (dedupe), provide:
+   ```json
+   {
+     "<niche>": {
+       "why_long": "data-grounded paragraph citing real outlier stats",
+       "recommendation": "honest pick + automatability + RPM reality",
+       "channel_concept": "one-line channel concept",
+       "fingerprint": "title + thumbnail formula from yt-format-analyst",
+       "ready_video": {"title": "...", "hook": "...", "outline": ["..."],
+                       "thumbnail_brief": "...", "description": "..."},
+       "backups": ["5 follow-up video ideas"]
+     }
+   }
+   ```
+   Ground every `why_long` in real numbers from `niche-data.json` (outlier ratios,
+   breakout counts, specific channels/views). Make `ready_video` genuinely
+   produceable - it feeds straight into `/youtube full`.
+
+2. **Generate the dashboard:**
+   ```bash
+   python .claude/scripts/niche_dashboard.py <research-dir>
+   ```
+   This writes `dashboard.html` (self-contained, cards + click-through workflows).
+   Tell the user the path and that it opens in any browser.
+
+## Step 4b: Also write the Playbook Report (markdown fallback)
 
 Write `niche-playbook.md` next to `niche-data.json`. For the **top 3 niches by
 viral opportunity** AND the **top 3 by automation score** (dedupe overlap), output:

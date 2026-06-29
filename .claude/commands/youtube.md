@@ -86,9 +86,11 @@ Spawn `@yt-niche-finder` agent via Task tool to:
 1. Run `.claude/scripts/niche_finder.py` (pass `--seeds "$2"` if seeds were given)
 2. Discover low-sub / high-view outlier videos (500-15k subs, last 30 days)
 3. Rate niches by viral opportunity AND by AI-automatability (two rankings)
-4. Write `niche-playbook.md` with hard data, embedded thumbnails, and a per-niche
-   "start this channel, make these videos, here's the workflow" plan
-5. Recommend a best-overall niche and a best-to-automate niche
+4. Build `dashboard.html` (primary output) via `niche_dashboard.py`: clickable niche
+   cards (thumbnail, virality + AI-autonomy, why, recommendation) that open a full
+   workflow on click - a ready-to-make video + backup ideas + copy-paste command
+5. Also write `niche-playbook.md` (markdown fallback) with the same content
+6. Recommend a best-overall niche and a best-to-automate niche
 
 Requires a `YOUTUBE_API_KEY` env var. If missing, the agent tells the user how to
 create one. No topic needed; `$2` (optional) adds seed niches to the built-in sweep.

@@ -25,6 +25,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   replicable format and generate your version (title variations + Canva thumbnail draft)
 - `--backtest` mode: evaluates past virality predictions against real 30-day outcomes
   and reports calibration (breakout rate by score band)
+- Clickable HTML dashboard (`niche_dashboard.py`): a card per niche (thumbnail, virality
+  + AI-autonomy scores, RPM, why it works, recommendation) that opens a full workflow on
+  click - a ready-to-make video plus backup ideas - with sort/filter and copy-command
+  buttons. Self-contained single file, opens in any browser.
 - `docs/NICHE_FINDER.md` documenting scoring methodology, algorithm strategy, and limits
 - Windows PowerShell installer (`install.ps1`) for full Windows support
 - GitHub issue templates (bug report, feature request)

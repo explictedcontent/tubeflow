@@ -23,6 +23,20 @@ For each niche it produces:
 5. **A playbook** - what channel to start, what videos to make, and the workflow to do it.
 6. **Visual evidence** - the actual thumbnails + titles of the breakout videos.
 
+### The dashboard (primary output)
+
+The headline deliverable is `dashboard.html` (built by `niche_dashboard.py`): a single
+self-contained file you open in any browser. A **card per niche** shows the thumbnail,
+virality + AI-autonomy scores, RPM, why it works, and a recommendation. **Click a card**
+and it opens the full workflow - a ready-to-make first video (title, hook, outline,
+thumbnail brief, description), backup ideas, a copy-paste `/youtube full` command, and the
+real outlier videos as proof. A sort toggle re-ranks the grid by Viral Opportunity, Best
+for Automation, Highest RPM, or Best Fit. Build it manually with:
+
+```
+python .claude/scripts/niche_dashboard.py 03-YouTube/niche-research/<date>
+```
+
 ---
 
 ## How the virality score works
