@@ -10,6 +10,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Niche Finder** (`/youtube niche`): discovers low-sub / high-view outlier videos
+  via the YouTube Data API v3 (500-15k subs, last 30 days), scores each video's
+  virality likelihood (0-100), and rates niches by opportunity and AI-automatability
+- Niche Finder produces two rankings (Viral Opportunity and Best for Automation) plus
+  a per-niche playbook with embedded thumbnails, titles, and a production workflow
+- `niche_finder.py` script with response caching (`--rescore` re-scores at zero quota)
+- `yt-niche-finder` agent and `niche:` configuration block
+- `docs/NICHE_FINDER.md` documenting scoring methodology, algorithm strategy, and limits
 - Windows PowerShell installer (`install.ps1`) for full Windows support
 - GitHub issue templates (bug report, feature request)
 - GitHub pull request template

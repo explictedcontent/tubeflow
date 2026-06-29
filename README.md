@@ -82,6 +82,14 @@ Automatically researches and credits open-source projects:
 ### Multi-Platform Social Media
 Platform-optimized posts for LinkedIn, Twitter/X, and Facebook from a single command.
 
+### Niche Finder
+Find niches a new small channel can actually break into. The `/youtube niche` command
+discovers low-subscriber / high-view outlier videos (500-15k subs, last 30 days), scores
+each one's virality likelihood, and rates niches by both viral opportunity and how much
+AI can produce. You get two rankings, the real thumbnails and titles of breakout videos,
+and a per-niche playbook (what channel to start, what to make, and the workflow). See
+[docs/NICHE_FINDER.md](docs/NICHE_FINDER.md).
+
 ---
 
 ## Quick Start
@@ -102,14 +110,15 @@ cd tubeflow
 
 ## Installed Components
 
-TubeFlow includes **47 files** across 11 categories:
+TubeFlow includes **50 files** across 11 categories:
 
-### Agents (9 files)
+### Agents (10 files)
 
 Specialized AI agents in `.claude/agents/`:
 
 | Agent | File | Purpose |
 |-------|------|---------|
+| **Niche Finder** | `yt-niche-finder.md` | Finds outlier niches, rates virality + automatability, builds a playbook |
 | **YouTube Creator** | `youtube-creator.md` | Creates video scripts, ideas, descriptions, full packages |
 | **YouTube Publisher** | `youtube-publisher.md` | Handles post-upload workflow, moves files, creates metadata |
 | **YouTube Syncer** | `youtube-syncer.md` | Syncs published videos to public GitHub repository |
@@ -140,12 +149,13 @@ Workflow skills in `.claude/skills/`:
 | **YouTube Research** | `youtube-research/` | Research orchestration, agent coordination |
 | **Social Workflow** | `social-workflow/` | Platform-specific posting guidelines |
 
-### Python Scripts (5 files)
+### Python Scripts (6 files)
 
 Utility scripts in `.claude/scripts/`:
 
 | Script | Purpose |
 |--------|---------|
+| `niche_finder.py` | Discovers outlier videos, scores virality, ranks niches (YouTube Data API) |
 | `sync_videos.py` | Syncs videos to public repo, creates READMEs, updates catalog |
 | `create_issues.py` | Creates GitHub Issues from roadmap for community voting |
 | `fetch_descriptions.py` | Fetches full descriptions from YouTube via yt-dlp |
@@ -167,7 +177,7 @@ Content templates in `templates/`:
 | `social-twitter.md` | Twitter/X post and thread template |
 | `social-facebook.md` | Facebook post template |
 
-### Documentation (4 files)
+### Documentation (5 files)
 
 Guides in `docs/`:
 
@@ -176,6 +186,7 @@ Guides in `docs/`:
 | `GETTING_STARTED.md` | Step-by-step setup and first workflow |
 | `CONFIGURATION.md` | Complete config.yaml reference |
 | `WORKFLOWS.md` | Detailed workflow documentation |
+| `NICHE_FINDER.md` | Niche finder methodology, scoring, and algorithm strategy |
 | `CONTRIBUTING.md` | How to contribute to TubeFlow |
 
 ### GitHub Templates (4 files)
@@ -227,6 +238,7 @@ Production example in `examples/webnestify/`:
 
 | Command | Description | Output |
 |---------|-------------|--------|
+| `/youtube niche ["seeds"]` | Find outlier niches + virality ratings | `{{YOUTUBE_ROOT}}/niche-research/YYYY-MM-DD/` |
 | `/youtube idea "Topic"` | Quick idea capture | `{{YOUTUBE_ROOT}}/ideas/YYYY-MM-DD-topic.md` |
 | `/youtube full "Topic"` | Complete draft package | `{{YOUTUBE_ROOT}}/drafts/YYYY-MM-DD-topic/` |
 | `/youtube publish "Topic"` | Move to published | `{{YOUTUBE_ROOT}}/published/YYYY/topic-slug/` |
@@ -459,7 +471,8 @@ See [docs/CONFIGURATION.md](docs/CONFIGURATION.md) for complete reference.
 ```
 tubeflow/
 ├── .claude/
-│   ├── agents/                    # 9 AI agent definitions
+│   ├── agents/                    # 10 AI agent definitions
+│   │   ├── yt-niche-finder.md
 │   │   ├── youtube-creator.md
 │   │   ├── youtube-publisher.md
 │   │   ├── youtube-syncer.md
@@ -477,7 +490,8 @@ tubeflow/
 │   │   ├── youtube-workflow/
 │   │   ├── youtube-research/
 │   │   └── social-workflow/
-│   └── scripts/                   # 5 Python utilities
+│   └── scripts/                   # 6 Python utilities
+│       ├── niche_finder.py
 │       ├── sync_videos.py
 │       ├── create_issues.py
 │       ├── fetch_descriptions.py
@@ -492,10 +506,11 @@ tubeflow/
 │   ├── social-linkedin.md
 │   ├── social-twitter.md
 │   └── social-facebook.md
-├── docs/                          # 4 documentation files
+├── docs/                          # 5 documentation files
 │   ├── GETTING_STARTED.md
 │   ├── CONFIGURATION.md
 │   ├── WORKFLOWS.md
+│   ├── NICHE_FINDER.md
 │   └── CONTRIBUTING.md
 ├── examples/
 │   └── webnestify/                # Production example
@@ -700,14 +715,14 @@ Interactive wizard handles prerequisites, configuration, and template processing
 
 | Metric | Value |
 |--------|-------|
-| **Agents** | 9 specialized AI agents |
+| **Agents** | 10 specialized AI agents |
 | **Commands** | 3 slash commands |
 | **Skills** | 3 workflow skills |
 | **Templates** | 8 content templates |
-| **Scripts** | 5 Python utilities |
+| **Scripts** | 6 Python utilities |
 | **Platforms** | 4 (YouTube + LinkedIn + Twitter + Facebook) |
 | **Research agents (parallel)** | 4 + 1 strategist |
-| **Total files** | 47 |
+| **Total files** | 50 |
 | **License** | MIT (fully open-source) |
 
 ---

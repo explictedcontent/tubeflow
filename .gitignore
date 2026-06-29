@@ -65,3 +65,7 @@ htmlcov/
 *.tmp
 *.temp
 .cache/
+
+# Niche finder (cached API responses + generated reports)
+.claude/scripts/.niche_cache/
+niche-research/

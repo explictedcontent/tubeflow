@@ -110,6 +110,52 @@ features:
   # Include "About" section in YouTube descriptions
   include_about_section: true
 
+  # Enable the niche finder (/youtube niche). Discovers low-sub / high-view
+  # outlier videos, rates niches, and recommends where to go.
+  niche_finder: true
+
+# =============================================================================
+# NICHE FINDER
+# =============================================================================
+# Powers /youtube niche. Requires a free YouTube Data API v3 key.
+# Create one at https://console.cloud.google.com/ (enable "YouTube Data API v3").
+niche:
+  # Environment variable that holds your API key
+  api_key_env: "YOUTUBE_API_KEY"
+
+  # Outlier subscriber band (find small channels punching above their weight)
+  sub_min: 500
+  sub_max: 15000
+
+  # Only consider videos published in the last N days
+  days: 30
+
+  # Region + how many videos to pull per keyword (50 = 1 API page = 100 quota units)
+  region: "US"
+  max_per_keyword: 50
+
+  # Per-video virality score weights (must reflect "low subs, high views")
+  weights:
+    outlier: 0.5      # views / subscribers - the core breakout signal
+    velocity: 0.3     # views per day since upload
+    engagement: 0.2   # (likes + comments) / views
+
+  # Per-niche opportunity score weights
+  niche_weights:
+    breakout: 0.30    # how many DISTINCT small channels broke out (repeatable)
+    outlier: 0.25     # average outlier strength
+    virality: 0.25    # median per-video virality
+    openness: 0.20    # low saturation by mega-channels = room for newcomers
+
+  # Optional: override the built-in candidate niche list the sweep ranks.
+  # Each entry: name, keywords, format, automatability (0-100, how much AI can do).
+  # Leave commented to use the built-in list (see niche_finder.py).
+  # candidates:
+  #   - name: "AI Tools & News"
+  #     keywords: ["ai tools", "ai news"]
+  #     format: "screen-rec + voice"
+  #     automatability: 95
+
 # =============================================================================
 # ABOUT SECTION (For YouTube descriptions)
 # =============================================================================
