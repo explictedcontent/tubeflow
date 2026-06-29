@@ -502,8 +502,15 @@ def _fit_score(automatability: int, fit: dict) -> float:
 
 # === THUMBNAILS ===
 
-def download_thumbnails(records: list, out_dir: Path, per_niche: int) -> None:
-    """Download top-N video thumbnails per niche into out_dir/thumbs/."""
+def download_thumbnails(records: list, out_dir: Path, per_niche: int) -> tuple:
+    """
+    Download top-N video thumbnails per niche into out_dir/thumbs/.
+
+    Only sets thumbnail_local on a SUCCESSFUL download, so the report falls back
+    to the remote thumbnail URL when the image host is blocked (e.g. a restricted
+    network policy) instead of emitting a broken local link.
+    Returns (downloaded, attempted).
+    """
     thumbs_dir = out_dir / "thumbs"
     thumbs_dir.mkdir(parents=True, exist_ok=True)
 
@@ -511,6 +518,8 @@ def download_thumbnails(records: list, out_dir: Path, per_niche: int) -> None:
     for r in records:
         by_niche.setdefault(r["niche"], []).append(r)
 
+    downloaded = 0
+    attempted = 0
     for niche, recs in by_niche.items():
         top = sorted(recs, key=lambda r: r.get("virality_score", 0), reverse=True)[:per_niche]
         for r in top:
@@ -518,16 +527,21 @@ def download_thumbnails(records: list, out_dir: Path, per_niche: int) -> None:
             if not url:
                 continue
             local = thumbs_dir / f"{r['video_id']}.jpg"
-            r["thumbnail_local"] = str(Path("thumbs") / f"{r['video_id']}.jpg")
+            rel = str(Path("thumbs") / f"{r['video_id']}.jpg")
             if local.exists():
+                r["thumbnail_local"] = rel
                 continue
+            attempted += 1
             try:
                 resp = requests.get(url, timeout=20)
                 if resp.status_code == 200:
                     with open(local, "wb") as f:
                         f.write(resp.content)
+                    r["thumbnail_local"] = rel
+                    downloaded += 1
             except requests.RequestException:
                 continue
+    return downloaded, attempted
 
 
 # === OUTPUT ===
@@ -893,7 +907,11 @@ def main():
 
     if not args.no_thumbnails and not args.rescore:
         per_niche = max(args.top_examples, 3)
-        download_thumbnails(all_records, out_dir, per_niche)
+        dl, attempted = download_thumbnails(all_records, out_dir, per_niche)
+        if attempted and dl == 0:
+            print("\nNote: thumbnail image downloads were blocked (likely a restricted "
+                  "network policy). The report falls back to remote thumbnail URLs - they "
+                  "open fine in a browser. On an unrestricted machine they download locally.")
 
     data_path = write_data(out_dir, niche_summaries, all_records,
                            {"sub_min": args.sub_min, "sub_max": args.sub_max,
