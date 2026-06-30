@@ -29,6 +29,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   + AI-autonomy scores, RPM, why it works, recommendation) that opens a full workflow on
   click - a ready-to-make video plus backup ideas - with sort/filter and copy-command
   buttons. Self-contained single file, opens in any browser.
+- Agent interface: one-command pipeline (`niche_pipeline.py`, with `--json` and `--llm`)
+  that runs sweep → workflows → dashboard in one trigger; an importable "agent contract"
+  (`niche_api.py`) with model-agnostic workflow authoring via any OpenAI-compatible endpoint
+  (Anthropic/OpenAI/Ollama/Hermes); and an optional MCP server (`niche_mcp.py`) exposing the
+  finder to any agent. Documented in `docs/AGENT_API.md`.
 - `docs/NICHE_FINDER.md` documenting scoring methodology, algorithm strategy, and limits
 - Windows PowerShell installer (`install.ps1`) for full Windows support
 - GitHub issue templates (bug report, feature request)

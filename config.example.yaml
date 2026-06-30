@@ -147,6 +147,14 @@ niche:
     virality: 0.25    # median per-video virality
     openness: 0.20    # low saturation by mega-channels = room for newcomers
 
+  # Agent / one-command pipeline: `niche_pipeline.py` runs sweep -> workflows ->
+  # dashboard in one shot. For headless workflow authoring (--llm) or the MCP
+  # server, set these env vars (any OpenAI-compatible endpoint - "Hermes-friendly"):
+  #   LLM_BASE_URL  e.g. https://api.openai.com/v1 or http://localhost:11434/v1
+  #   LLM_API_KEY   provider key (optional for local models)
+  #   LLM_MODEL     e.g. gpt-4o-mini, claude-..., hermes-3-llama-3.1-8b
+  # See docs/AGENT_API.md.
+
   # Channel fit: tailors recommendations to your constraints. When set, niches get
   # a fit_score and the agent re-ranks toward what suits you (e.g. on_camera: false
   # deprioritizes camera-heavy, low-automatability niches).

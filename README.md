@@ -110,7 +110,7 @@ cd tubeflow
 
 ## Installed Components
 
-TubeFlow includes **53 files** across 11 categories:
+TubeFlow includes **57 files** across 11 categories:
 
 ### Agents (11 files)
 
@@ -150,7 +150,7 @@ Workflow skills in `.claude/skills/`:
 | **YouTube Research** | `youtube-research/` | Research orchestration, agent coordination |
 | **Social Workflow** | `social-workflow/` | Platform-specific posting guidelines |
 
-### Python Scripts (8 files)
+### Python Scripts (11 files)
 
 Utility scripts in `.claude/scripts/`:
 
@@ -159,6 +159,9 @@ Utility scripts in `.claude/scripts/`:
 | `niche_finder.py` | Discovers outlier videos, scores virality, ranks niches (YouTube Data API) |
 | `niche_db.py` | SQLite store: accumulates channels/videos/stats for trajectory + backtesting |
 | `niche_dashboard.py` | Builds a clickable HTML dashboard (niche cards + click-through workflows) |
+| `niche_pipeline.py` | One-command agent pipeline: sweep → workflows → dashboard (`--json`, `--llm`) |
+| `niche_api.py` | Importable "agent contract" + model-agnostic (OpenAI-compatible) workflow authoring |
+| `niche_mcp.py` | Optional MCP server exposing the finder to any agent (Claude or open models) |
 | `sync_videos.py` | Syncs videos to public repo, creates READMEs, updates catalog |
 | `create_issues.py` | Creates GitHub Issues from roadmap for community voting |
 | `fetch_descriptions.py` | Fetches full descriptions from YouTube via yt-dlp |
@@ -180,7 +183,7 @@ Content templates in `templates/`:
 | `social-twitter.md` | Twitter/X post and thread template |
 | `social-facebook.md` | Facebook post template |
 
-### Documentation (5 files)
+### Documentation (6 files)
 
 Guides in `docs/`:
 
@@ -190,6 +193,7 @@ Guides in `docs/`:
 | `CONFIGURATION.md` | Complete config.yaml reference |
 | `WORKFLOWS.md` | Detailed workflow documentation |
 | `NICHE_FINDER.md` | Niche finder methodology, scoring, and algorithm strategy |
+| `AGENT_API.md` | Agent/MCP interface: one-command pipeline + model-agnostic API |
 | `CONTRIBUTING.md` | How to contribute to TubeFlow |
 
 ### GitHub Templates (4 files)
@@ -494,10 +498,13 @@ tubeflow/
 │   │   ├── youtube-workflow/
 │   │   ├── youtube-research/
 │   │   └── social-workflow/
-│   └── scripts/                   # 8 Python utilities
+│   └── scripts/                   # 11 Python utilities
 │       ├── niche_finder.py
 │       ├── niche_db.py
 │       ├── niche_dashboard.py
+│       ├── niche_pipeline.py
+│       ├── niche_api.py
+│       ├── niche_mcp.py
 │       ├── sync_videos.py
 │       ├── create_issues.py
 │       ├── fetch_descriptions.py
@@ -512,11 +519,12 @@ tubeflow/
 │   ├── social-linkedin.md
 │   ├── social-twitter.md
 │   └── social-facebook.md
-├── docs/                          # 5 documentation files
+├── docs/                          # 6 documentation files
 │   ├── GETTING_STARTED.md
 │   ├── CONFIGURATION.md
 │   ├── WORKFLOWS.md
 │   ├── NICHE_FINDER.md
+│   ├── AGENT_API.md
 │   └── CONTRIBUTING.md
 ├── examples/
 │   └── webnestify/                # Production example
@@ -725,10 +733,10 @@ Interactive wizard handles prerequisites, configuration, and template processing
 | **Commands** | 3 slash commands |
 | **Skills** | 3 workflow skills |
 | **Templates** | 8 content templates |
-| **Scripts** | 8 Python utilities |
+| **Scripts** | 11 Python utilities |
 | **Platforms** | 4 (YouTube + LinkedIn + Twitter + Facebook) |
 | **Research agents (parallel)** | 4 + 1 strategist |
-| **Total files** | 53 |
+| **Total files** | 57 |
 | **License** | MIT (fully open-source) |
 
 ---

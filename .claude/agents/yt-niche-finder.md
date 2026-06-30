@@ -26,15 +26,20 @@ You run the data engine, then add the judgement it cannot make on its own:
 
 ## Step 1: Run the Data Engine
 
-The script `niche_finder.py` does discovery, per-video virality scoring, and
-niche ranking. Run it from the vault/repo root:
+**Preferred (one command):** `niche_pipeline.py` runs discovery + dashboard in one
+shot and prints a machine-readable summary with `--json`:
 
 ```bash
-python .claude/scripts/niche_finder.py            # sweep built-in niches
-python .claude/scripts/niche_finder.py --seeds "homelab, self hosting"   # add seeds
+python .claude/scripts/niche_pipeline.py --json            # sweep + dashboard
+python .claude/scripts/niche_pipeline.py --seeds "homelab" --json
 ```
 
-Pass through any user filters: `--sub-min`, `--sub-max`, `--days`, `--region`.
+Parse its JSON (`out_dir`, `dashboard_path`, `top_niches`, `workflows_status`). When
+`workflows_status` is `deferred-to-caller`, YOU author `niche-workflows.json` (Steps
+3-4) and then rebuild the dashboard with `python .claude/scripts/niche_dashboard.py <out_dir>`.
+
+(The lower-level `niche_finder.py` still works the same way for discovery only:
+`--sub-min`, `--sub-max`, `--days`, `--region`, `--seeds`.)
 
 **Preconditions:**
 - The `YOUTUBE_API_KEY` env var must be set. If the script reports a missing key,

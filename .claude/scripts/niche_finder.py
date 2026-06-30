@@ -732,6 +732,129 @@ def run_backtest(client: "ApiClient", conn, min_age_days: int) -> None:
         print(f"\nTop-half avg {ta:.1f}x vs bottom-half avg {ba:.1f}x outlier -> score looks {verdict}.")
 
 
+# === CORE (shared by CLI, niche_api, MCP) ===
+
+def run_discovery(config, niche_cfg, *, seeds=None, sub_min=500, sub_max=15000, days=30,
+                  region="US", max_per_keyword=50, api_key="", output_dir="",
+                  rescore=False, no_db=False, no_thumbnails=False, top_examples=3,
+                  verbose=True):
+    """
+    Run the full discovery -> scoring -> output pipeline once.
+
+    Returns a result dict: {ok, reason, out_dir, data_path, report_path, niches,
+    n_videos, quota}. This is the single source of truth used by main() (CLI),
+    niche_api.discover(), and the MCP server - no logic is duplicated downstream.
+    """
+    def say(*a):
+        if verbose:
+            print(*a)
+
+    niches = get_candidate_niches(config, seeds or [])
+    total_searches = sum(len(n.get("keywords", [])) for n in niches)
+    say(f"Niches to sweep: {len(niches)} ({total_searches} keyword searches)")
+    if rescore:
+        say("Mode: rescore (cache only, 0 quota)")
+    else:
+        say(f"Estimated quota: ~{total_searches * 100} units (search) + a few for lookups")
+        say(f"  Filters: subs {sub_min}-{sub_max}, last {days} days, region {region}")
+
+    published_after = (datetime.now(timezone.utc) - timedelta(days=days)) \
+        .strftime("%Y-%m-%dT%H:%M:%SZ")
+    cache_dir = Path(__file__).parent / ".niche_cache"
+    client = ApiClient(api_key or "none", cache_dir, rescore=rescore)
+
+    weights = niche_cfg.get("weights", {"outlier": 0.5, "velocity": 0.3, "engagement": 0.2})
+    niche_weights = niche_cfg.get("niche_weights",
+                                  {"breakout": 0.30, "outlier": 0.25,
+                                   "virality": 0.25, "openness": 0.20})
+
+    niche_records, niche_meta, found_counts, big_counts, view_totals = {}, {}, {}, {}, {}
+
+    for niche in niches:
+        name = niche["name"]
+        niche_meta[name] = niche
+        say(f"[{name}] searching {niche.get('keywords', [])}...")
+
+        video_ids = []
+        for kw in niche.get("keywords", []):
+            video_ids.extend(search_videos(client, kw, published_after, region, max_per_keyword))
+        video_ids = list(dict.fromkeys(video_ids))
+        if not video_ids:
+            say("  no videos found")
+            niche_records[name] = []
+            continue
+
+        videos = fetch_videos(client, video_ids)
+        channel_ids = {v.get("snippet", {}).get("channelId")
+                       for v in videos.values() if v.get("snippet", {}).get("channelId")}
+        channels = fetch_channels(client, channel_ids)
+
+        records, total_found, big, views_all = build_video_records(
+            videos, channels, name, sub_min, sub_max)
+        niche_records[name] = records
+        found_counts[name] = total_found
+        big_counts[name] = big
+        view_totals[name] = views_all
+        say(f"  {len(records)} in band (of {total_found} found, {big} big channels)")
+
+    all_records = [r for recs in niche_records.values() for r in recs]
+    score_videos(all_records, weights)
+
+    if not all_records:
+        return {"ok": False, "reason": "no_match", "out_dir": None, "data_path": None,
+                "report_path": None, "niches": [], "n_videos": 0, "quota": client.quota_spent}
+
+    if niche_db is not None and not no_db:
+        conn = niche_db.connect()
+        ts = niche_db.now_iso()
+        seen_channels = {}
+        for r in all_records:
+            cid = r["channel_id"]
+            if cid and cid not in seen_channels:
+                niche_db.record_channel(conn, cid, r["channel_title"], r["channel_country"],
+                                        r["channel_created"], r["subscribers"],
+                                        r["channel_video_count"], r["channel_total_views"], ts)
+                seen_channels[cid] = True
+            niche_db.record_video(conn, r["video_id"], cid, r["title"], r["niche"],
+                                  r["published_at"], r["thumbnail"],
+                                  r["views"], r["likes"], r["comments"], ts)
+            niche_db.log_prediction(conn, r["video_id"], r["niche"],
+                                    r.get("virality_score", 0), r["subscribers"],
+                                    r["views"], r["outlier_ratio"], ts)
+        conn.commit()
+        for r in all_records:
+            r["trajectory"] = niche_db.channel_trajectory(conn, r["channel_id"])
+        db_stats = niche_db.stats(conn)
+        conn.close()
+        say(f"\nDB now holds {db_stats['channels']} channels, {db_stats['videos']} videos, "
+            f"{db_stats['channel_snapshots']} channel snapshots.")
+
+    fit = niche_cfg.get("fit") or None
+    niche_summaries = score_niches(niche_records, niche_meta, found_counts,
+                                   big_counts, view_totals, niche_weights, fit)
+
+    if output_dir:
+        out_dir = Path(os.path.expanduser(output_dir))
+    else:
+        youtube_root = (config.get("structure", {}) or {}).get("youtube_root", "03-YouTube")
+        out_dir = Path.cwd() / youtube_root / "niche-research" / datetime.now().strftime("%Y-%m-%d")
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    if not no_thumbnails and not rescore:
+        dl, attempted = download_thumbnails(all_records, out_dir, max(top_examples, 3))
+        if attempted and dl == 0:
+            say("\nNote: thumbnail downloads were blocked (restricted network). The report "
+                "falls back to remote URLs - they open fine in a browser.")
+
+    params = {"sub_min": sub_min, "sub_max": sub_max, "days": days, "region": region}
+    data_path = write_data(out_dir, niche_summaries, all_records, params)
+    report_path = write_report(out_dir, niche_summaries, all_records, params, top_examples)
+
+    return {"ok": True, "reason": "ok", "out_dir": str(out_dir), "data_path": str(data_path),
+            "report_path": str(report_path), "niches": niche_summaries,
+            "n_videos": len(all_records), "quota": client.quota_spent}
+
+
 # === MAIN ===
 
 def main():
@@ -794,138 +917,23 @@ def main():
         return
 
     seeds = [s for s in args.seeds.split(",") if s.strip()] if args.seeds else []
-    niches = get_candidate_niches(config, seeds)
 
-    # Quota estimate.
-    total_searches = sum(len(n.get("keywords", [])) for n in niches)
-    est_quota = total_searches * 100
-    print(f"Niches to sweep: {len(niches)} ({total_searches} keyword searches)")
-    if args.rescore:
-        print("Mode: --rescore (cache only, 0 quota)")
-    else:
-        print(f"Estimated quota: ~{est_quota} units (search) + a few units for lookups")
-        print(f"  Default daily quota is 10,000 units. Filters: subs "
-              f"{args.sub_min}-{args.sub_max}, last {args.days} days, region {args.region}")
-    print("")
+    result = run_discovery(
+        config, niche_cfg, seeds=seeds, sub_min=args.sub_min, sub_max=args.sub_max,
+        days=args.days, region=args.region, max_per_keyword=args.max_per_keyword,
+        api_key=api_key, output_dir=args.output, rescore=args.rescore, no_db=args.no_db,
+        no_thumbnails=args.no_thumbnails, top_examples=args.top_examples, verbose=True)
 
-    published_after = (datetime.now(timezone.utc) - timedelta(days=args.days)) \
-        .strftime("%Y-%m-%dT%H:%M:%SZ")
-
-    cache_dir = Path(__file__).parent / ".niche_cache"
-    client = ApiClient(api_key or "none", cache_dir, rescore=args.rescore)
-
-    weights = niche_cfg.get("weights", {"outlier": 0.5, "velocity": 0.3, "engagement": 0.2})
-    niche_weights = niche_cfg.get("niche_weights",
-                                  {"breakout": 0.30, "outlier": 0.25,
-                                   "virality": 0.25, "openness": 0.20})
-
-    niche_records = {}
-    niche_meta = {}
-    found_counts = {}
-    big_counts = {}
-    view_totals = {}
-
-    for niche in niches:
-        name = niche["name"]
-        niche_meta[name] = niche
-        print(f"[{name}] searching {niche.get('keywords', [])}...")
-
-        video_ids = []
-        for kw in niche.get("keywords", []):
-            video_ids.extend(search_videos(client, kw, published_after,
-                                           args.region, args.max_per_keyword))
-        video_ids = list(dict.fromkeys(video_ids))  # dedupe, keep order
-        if not video_ids:
-            print("  no videos found")
-            niche_records[name] = []
-            continue
-
-        videos = fetch_videos(client, video_ids)
-        channel_ids = {v.get("snippet", {}).get("channelId")
-                       for v in videos.values() if v.get("snippet", {}).get("channelId")}
-        channels = fetch_channels(client, channel_ids)
-
-        records, total_found, big, views_all = build_video_records(
-            videos, channels, name, args.sub_min, args.sub_max)
-        niche_records[name] = records
-        found_counts[name] = total_found
-        big_counts[name] = big
-        view_totals[name] = views_all
-        print(f"  {len(records)} in band (of {total_found} found, {big} big channels)")
-
-    # Score every in-band video globally (so scores compare across niches).
-    all_records = [r for recs in niche_records.values() for r in recs]
-    score_videos(all_records, weights)
-
-    if not all_records:
+    if not result["ok"]:
         print("\nNo videos matched the subscriber band. Try widening --sub-max or "
               "increasing --days, or check your API key/quota.")
         sys.exit(0)
 
-    # Accumulate into the DB (channels, videos, snapshots, predictions) and
-    # enrich each record with the channel's growth trajectory from history.
-    if niche_db is not None and not args.no_db:
-        conn = niche_db.connect()
-        ts = niche_db.now_iso()
-        seen_channels = {}
-        for r in all_records:
-            cid = r["channel_id"]
-            if cid and cid not in seen_channels:
-                niche_db.record_channel(conn, cid, r["channel_title"],
-                                        r["channel_country"], r["channel_created"],
-                                        r["subscribers"], r["channel_video_count"],
-                                        r["channel_total_views"], ts)
-                seen_channels[cid] = True
-            niche_db.record_video(conn, r["video_id"], cid, r["title"], r["niche"],
-                                  r["published_at"], r["thumbnail"],
-                                  r["views"], r["likes"], r["comments"], ts)
-            niche_db.log_prediction(conn, r["video_id"], r["niche"],
-                                    r.get("virality_score", 0), r["subscribers"],
-                                    r["views"], r["outlier_ratio"], ts)
-        conn.commit()
-        for r in all_records:
-            traj = niche_db.channel_trajectory(conn, r["channel_id"])
-            r["trajectory"] = traj
-        db_stats = niche_db.stats(conn)
-        conn.close()
-        print(f"\nDB now holds {db_stats['channels']} channels, {db_stats['videos']} videos, "
-              f"{db_stats['channel_snapshots']} channel snapshots "
-              f"(re-run with --repoll over days to build trajectory history).")
-
-    fit = niche_cfg.get("fit") or None
-    niche_summaries = score_niches(niche_records, niche_meta, found_counts,
-                                   big_counts, view_totals, niche_weights, fit)
-
-    # Output location.
-    if args.output:
-        out_dir = Path(os.path.expanduser(args.output))
-    else:
-        youtube_root = (config.get("structure", {}) or {}).get("youtube_root", "03-YouTube")
-        date_str = datetime.now().strftime("%Y-%m-%d")
-        out_dir = Path.cwd() / youtube_root / "niche-research" / date_str
-    out_dir.mkdir(parents=True, exist_ok=True)
-
-    if not args.no_thumbnails and not args.rescore:
-        per_niche = max(args.top_examples, 3)
-        dl, attempted = download_thumbnails(all_records, out_dir, per_niche)
-        if attempted and dl == 0:
-            print("\nNote: thumbnail image downloads were blocked (likely a restricted "
-                  "network policy). The report falls back to remote thumbnail URLs - they "
-                  "open fine in a browser. On an unrestricted machine they download locally.")
-
-    data_path = write_data(out_dir, niche_summaries, all_records,
-                           {"sub_min": args.sub_min, "sub_max": args.sub_max,
-                            "days": args.days, "region": args.region})
-    report_path = write_report(out_dir, niche_summaries, all_records,
-                               {"sub_min": args.sub_min, "sub_max": args.sub_max,
-                                "days": args.days, "region": args.region},
-                               args.top_examples)
-
-    print(f"\nDone. Quota spent this run: {client.quota_spent} units")
-    print(f"  Data:   {data_path}")
-    print(f"  Report: {report_path}")
+    print(f"\nDone. Quota spent this run: {result['quota']} units")
+    print(f"  Data:   {result['data_path']}")
+    print(f"  Report: {result['report_path']}")
     print("\nTop niches by viral opportunity:")
-    for i, s in enumerate(niche_summaries[:5], 1):
+    for i, s in enumerate(result["niches"][:5], 1):
         print(f"  {i}. {s['niche']} - opportunity {s['opportunity_score']}, "
               f"automatability {s['automatability']}%")
     print("\nNext: review the report, or run /youtube niche to get the full playbook.")

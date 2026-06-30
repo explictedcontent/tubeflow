@@ -83,7 +83,8 @@ Task 3: description: "Create idea 3", subagent_type: "youtube-creator", prompt: 
 ### If `$1` = "niche"
 
 Spawn `@yt-niche-finder` agent via Task tool to:
-1. Run `.claude/scripts/niche_finder.py` (pass `--seeds "$2"` if seeds were given)
+1. Run `.claude/scripts/niche_pipeline.py --json` (the one-command pipeline; pass
+   `--seeds "$2"` if seeds were given) - sweep + dashboard in one step
 2. Discover low-sub / high-view outlier videos (500-15k subs, last 30 days)
 3. Rate niches by viral opportunity AND by AI-automatability (two rankings)
 4. Build `dashboard.html` (primary output) via `niche_dashboard.py`: clickable niche
