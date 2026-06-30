@@ -16,6 +16,7 @@ Create and manage YouTube content for the {{CHANNEL_HANDLE}} channel.
 
 | Command | Agent | Task Tool Usage |
 |---------|-------|-----------------|
+| `niche` | `@yt-niche-finder` | `subagent_type: "yt-niche-finder"` |
 | `idea` | `@youtube-creator` | `subagent_type: "youtube-creator"` |
 | `full` | `@youtube-creator` | `subagent_type: "youtube-creator"` |
 | `publish` | `@youtube-publisher` | `subagent_type: "youtube-publisher"` |
@@ -62,6 +63,7 @@ Task 3: description: "Create idea 3", subagent_type: "youtube-creator", prompt: 
 ## Usage
 
 ```
+/youtube niche ["seeds"]   - Find low-sub / high-view outlier niches + virality ratings
 /youtube idea "Topic"      - Quick idea capture
 /youtube full "Topic"      - Complete draft package (script + description + thumbnail text)
 /youtube publish "Topic"   - Move draft to published after upload
@@ -70,13 +72,35 @@ Task 3: description: "Create idea 3", subagent_type: "youtube-creator", prompt: 
 
 ## Arguments Received
 
-- **Type**: `$1` (idea, full, publish, or sync)
-- **Topic**: `$2` (video topic/title)
+- **Type**: `$1` (niche, idea, full, publish, or sync)
+- **Topic**: `$2` (video topic/title, or comma-separated seed niches for `niche`)
 - **Full args**: `$ARGUMENTS`
 
 ## Routing Logic
 
 **Remember**: Use Task tool to spawn agents (see CRITICAL section above).
+
+### If `$1` = "niche"
+
+Spawn `@yt-niche-finder` agent via Task tool to:
+1. Run `.claude/scripts/niche_pipeline.py --json` (the one-command pipeline; pass
+   `--seeds "$2"` if seeds were given) - sweep + dashboard in one step
+2. Discover low-sub / high-view outlier videos (500-15k subs, last 30 days)
+3. Rate niches by viral opportunity AND by AI-automatability (two rankings)
+4. Build `dashboard.html` (primary output) via `niche_dashboard.py`: clickable niche
+   cards (thumbnail, virality + AI-autonomy, why, recommendation) that open a full
+   workflow on click - a ready-to-make video + backup ideas + copy-paste command
+5. Also write `niche-playbook.md` (markdown fallback) with the same content
+6. Recommend a best-overall niche and a best-to-automate niche
+
+Requires a `YOUTUBE_API_KEY` env var. If missing, the agent tells the user how to
+create one. No topic needed; `$2` (optional) adds seed niches to the built-in sweep.
+
+The agent may hand off to `@yt-format-analyst` (Task tool,
+`subagent_type: "yt-format-analyst"`) to fingerprint a niche's winning thumbnails +
+titles and generate the user's version. Accumulation/calibration modes the agent can
+run or suggest: `niche_finder.py --repoll` (build channel trajectory history over
+days) and `--backtest` (check past predictions against real outcomes).
 
 ### If `$1` = "idea"
 

@@ -314,6 +314,7 @@ features:
   sponsorship_research: true
   obsidian_links: true
   include_about_section: true
+  niche_finder: true
 ```
 
 | Feature | Type | Default | Description |
@@ -324,6 +325,7 @@ features:
 | `sponsorship_research` | boolean | `true` | Research FUNDING.yml and GitHub Sponsors for open-source projects. |
 | `obsidian_links` | boolean | `true` | Use `[[wiki-links]]` instead of `[markdown](links)`. |
 | `include_about_section` | boolean | `true` | Include "About" section at end of YouTube descriptions. |
+| `niche_finder` | boolean | `true` | Enable `/youtube niche` (outlier niche discovery + virality ratings). |
 
 ### Feature Details
 
@@ -360,6 +362,54 @@ When enabled:
 When disabled:
 - No sponsorship information gathered
 - You'll need to add support links manually
+
+---
+
+## Niche Finder
+
+Configure `/youtube niche`, which discovers low-sub / high-view outlier videos,
+rates niches by virality and AI-automatability, and recommends where to go. See
+[NICHE_FINDER.md](NICHE_FINDER.md) for the full methodology.
+
+```yaml
+niche:
+  api_key_env: "YOUTUBE_API_KEY"
+  sub_min: 500
+  sub_max: 15000
+  days: 30
+  region: "US"
+  max_per_keyword: 50
+  weights:
+    outlier: 0.5
+    velocity: 0.3
+    engagement: 0.2
+  niche_weights:
+    breakout: 0.30
+    outlier: 0.25
+    virality: 0.25
+    openness: 0.20
+```
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `api_key_env` | string | `"YOUTUBE_API_KEY"` | Env var holding your YouTube Data API v3 key. |
+| `sub_min` / `sub_max` | int | `500` / `15000` | Outlier subscriber band to search within. |
+| `days` | int | `30` | Only consider videos published in the last N days. |
+| `region` | string | `"US"` | Region code for discovery. |
+| `max_per_keyword` | int | `50` | Videos pulled per keyword (50 = 1 API page = 100 quota units). |
+| `weights` | map | see above | Per-video virality weights (outlier / velocity / engagement). |
+| `niche_weights` | map | see above | Per-niche opportunity weights (breakout / outlier / virality / openness). |
+| `fit` | map | unset | Your constraints (`on_camera`, `hours_per_week`, `budget`, `skills`); tailors recommendations to you. |
+| `candidates` | list | built-in | Optional override of the candidate niche list (name, keywords, format, automatability, rpm). |
+
+The finder also accumulates data over time: `--repoll` re-fetches stats for known
+channels/videos to build trajectory history, and `--backtest` checks past predictions
+against real outcomes. State persists in `.claude/scripts/.niche_db.sqlite` (gitignored).
+
+**Requires a free YouTube Data API v3 key.** Create one at the
+[Google Cloud Console](https://console.cloud.google.com/) (enable "YouTube Data
+API v3", then create an API key) and export it as `YOUTUBE_API_KEY`. The script
+caches every API response so you can re-score with `--rescore` for zero quota.
 
 ---
 
@@ -452,6 +502,8 @@ TubeFlow respects these environment variables:
 | `TUBEFLOW_CONFIG` | Override config file path | `/custom/path/config.yaml` |
 | `TUBEFLOW_VAULT` | Override vault root path | `/path/to/vault` |
 | `TUBEFLOW_DEBUG` | Enable debug logging | `true` |
+| `YOUTUBE_API_KEY` | YouTube Data API v3 key for the niche finder | `AIza...` |
+| `YOUTUBE_INDEX_PATH` | Override path to `youtube-index.json` | `/path/to/youtube-index.json` |
 
 **Usage:**
 

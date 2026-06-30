@@ -10,6 +10,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Niche Finder** (`/youtube niche`): discovers low-sub / high-view outlier videos
+  via the YouTube Data API v3 (500-15k subs, last 30 days), scores each video's
+  virality likelihood (0-100), and rates niches by opportunity and AI-automatability
+- Niche Finder produces two rankings (Viral Opportunity and Best for Automation) plus
+  a per-niche playbook with embedded thumbnails, titles, and a production workflow
+- `niche_finder.py` script with response caching (`--rescore` re-scores at zero quota)
+- `yt-niche-finder` agent and `niche:` configuration block
+- Niche finder accumulation DB (`niche_db.py`, SQLite): persists channels/videos/stats
+  across runs; `--repoll` builds channel trajectory history (sub growth, outlier consistency)
+- Demand-vs-supply gap scoring, rough RPM (monetization) bands per niche, and a
+  `niche.fit` block that tailors recommendations to your constraints (on-camera, time)
+- `yt-format-analyst` agent: vision-analyzes winning thumbnails + titles to extract the
+  replicable format and generate your version (title variations + Canva thumbnail draft)
+- `--backtest` mode: evaluates past virality predictions against real 30-day outcomes
+  and reports calibration (breakout rate by score band)
+- Clickable HTML dashboard (`niche_dashboard.py`): a card per niche (thumbnail, virality
+  + AI-autonomy scores, RPM, why it works, recommendation) that opens a full workflow on
+  click - a ready-to-make video plus backup ideas - with sort/filter and copy-command
+  buttons. Self-contained single file, opens in any browser.
+- Agent interface: one-command pipeline (`niche_pipeline.py`, with `--json` and `--llm`)
+  that runs sweep → workflows → dashboard in one trigger; an importable "agent contract"
+  (`niche_api.py`) with model-agnostic workflow authoring via any OpenAI-compatible endpoint
+  (Anthropic/OpenAI/Ollama/Hermes); and an optional MCP server (`niche_mcp.py`) exposing the
+  finder to any agent. Documented in `docs/AGENT_API.md`.
+- `docs/NICHE_FINDER.md` documenting scoring methodology, algorithm strategy, and limits
 - Windows PowerShell installer (`install.ps1`) for full Windows support
 - GitHub issue templates (bug report, feature request)
 - GitHub pull request template

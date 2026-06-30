@@ -110,6 +110,70 @@ features:
   # Include "About" section in YouTube descriptions
   include_about_section: true
 
+  # Enable the niche finder (/youtube niche). Discovers low-sub / high-view
+  # outlier videos, rates niches, and recommends where to go.
+  niche_finder: true
+
+# =============================================================================
+# NICHE FINDER
+# =============================================================================
+# Powers /youtube niche. Requires a free YouTube Data API v3 key.
+# Create one at https://console.cloud.google.com/ (enable "YouTube Data API v3").
+niche:
+  # Environment variable that holds your API key
+  api_key_env: "YOUTUBE_API_KEY"
+
+  # Outlier subscriber band (find small channels punching above their weight)
+  sub_min: 500
+  sub_max: 15000
+
+  # Only consider videos published in the last N days
+  days: 30
+
+  # Region + how many videos to pull per keyword (50 = 1 API page = 100 quota units)
+  region: "US"
+  max_per_keyword: 50
+
+  # Per-video virality score weights (must reflect "low subs, high views")
+  weights:
+    outlier: 0.5      # views / subscribers - the core breakout signal
+    velocity: 0.3     # views per day since upload
+    engagement: 0.2   # (likes + comments) / views
+
+  # Per-niche opportunity score weights
+  niche_weights:
+    breakout: 0.30    # how many DISTINCT small channels broke out (repeatable)
+    outlier: 0.25     # average outlier strength
+    virality: 0.25    # median per-video virality
+    openness: 0.20    # low saturation by mega-channels = room for newcomers
+
+  # Agent / one-command pipeline: `niche_pipeline.py` runs sweep -> workflows ->
+  # dashboard in one shot. For headless workflow authoring (--llm) or the MCP
+  # server, set these env vars (any OpenAI-compatible endpoint - "Hermes-friendly"):
+  #   LLM_BASE_URL  e.g. https://api.openai.com/v1 or http://localhost:11434/v1
+  #   LLM_API_KEY   provider key (optional for local models)
+  #   LLM_MODEL     e.g. gpt-4o-mini, claude-..., hermes-3-llama-3.1-8b
+  # See docs/AGENT_API.md.
+
+  # Channel fit: tailors recommendations to your constraints. When set, niches get
+  # a fit_score and the agent re-ranks toward what suits you (e.g. on_camera: false
+  # deprioritizes camera-heavy, low-automatability niches).
+  fit:
+    on_camera: false        # will you appear on camera?
+    hours_per_week: 5       # time you can spend per video
+    # budget: "low"         # low / medium / high (informational, used by the agent)
+    # skills: ["editing"]   # informational, used by the agent
+
+  # Optional: override the built-in candidate niche list the sweep ranks.
+  # Each entry: name, keywords, format, automatability (0-100), rpm (rough $/1000 views).
+  # Leave commented to use the built-in list (see niche_finder.py).
+  # candidates:
+  #   - name: "AI Tools & News"
+  #     keywords: ["ai tools", "ai news"]
+  #     format: "screen-rec + voice"
+  #     automatability: 95
+  #     rpm: 12
+
 # =============================================================================
 # ABOUT SECTION (For YouTube descriptions)
 # =============================================================================
